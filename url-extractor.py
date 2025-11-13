@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,7 +20,10 @@ options.add_argument("start-maximized")
 options.add_argument("--disable-blink-features=AutomationControlled")
 options.add_argument("user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 options.add_argument("--headless")
-driver = webdriver.Chrome(options=options)
+
+# Usar webdriver-manager para gestionar ChromeDriver automáticamente
+service = Service(ChromeDriverManager().install())
+driver = webdriver.Chrome(service=service, options=options)
 
 # --- 1. Obtener URL de Categoría con Requests/BS4 ---
 url = "https://www.planetadelibros.com/"
@@ -50,21 +55,23 @@ driver.get(categoria_url)
 # Intentar aceptar cookies
 try:
     print("⏳ Buscando pop-up de cookies...")
-    # El selector del botón puede variar. Estoy asumiendo un selector típico.
-    # Necesitarías inspeccionar el elemento si este selector falla.
-    # Intento buscar por el botón "Aceptar todas las cookies"
+
+    WebDriverWait(driver, 5).until(
+        EC.presence_of_element_located((By.XPATH, "//button[contains(text(), 'Aceptar todas las cookies')]"))
+    )
+  
     cookie_button = WebDriverWait(driver, 5).until(
         EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Aceptar todas las cookies')]"))
     )
     cookie_button.click()
     print("✅ Cookies aceptadas.")
-    sleep(1) # Pequeña pausa para que desaparezca
+    sleep(1) 
 except TimeoutException:
     print("ℹ️ No se encontró o ya se cerró el pop-up de cookies.")
 except Exception as e:
     print(f"⚠️ Error al intentar cerrar el pop-up de cookies: {e}")
 
-# Esperar a que los libros de la categoría aparezcan
+
 try:
     WebDriverWait(driver, 10).until(
         EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".Libro_libro__YaI5f"))
@@ -81,7 +88,7 @@ print(f"📚 Se encontraron {len(books_elements)} libros.")
 books_data = []
 
 # Extraer los datos y enlaces de la lista de elementos EN LA PÁGINA DE CATEGORÍA
-for book_element in books_elements[:10]: # Limitar a 10
+for book_element in books_elements[:10]: 
     try:
         link_element = book_element.find_element(By.CSS_SELECTOR, "a")
 
@@ -100,7 +107,7 @@ for book_element in books_elements[:10]: # Limitar a 10
     except NoSuchElementException as e:
         print(f"⚠️ Error al obtener datos básicos de un libro: {e}")
     except StaleElementReferenceException:
-         # No debería pasar aquí, pero es una buena práctica
+         
         print("⚠️ Stale element al obtener datos básicos. Reintentando...")
         continue
 
@@ -116,7 +123,7 @@ for i, book in enumerate(books_data):
         synopsis = "Sinopsis no disponible"
         try:
             # 1. Buscar el contenedor principal de los párrafos de la sinopsis
-            # Nota: Mantenemos el selector que funciona en la página del libro.
+        
             article = driver.find_element(By.CSS_SELECTOR, "div[class*='FichaLibro_sinopsis'] article")
 
             # 2. Encontrar todos los elementos <p> dentro del artículo
@@ -128,10 +135,8 @@ for i, book in enumerate(books_data):
                 # Usamos .text para obtener el contenido visible del párrafo
                 text = p.text.strip()
                 if text: # Solo añadir si el texto no está vacío
-                    full_synopsis.append(text)
-    
-            # Unir los párrafos con un salto de línea o un espacio. 
-            # Usaremos dos saltos de línea para simular la separación visual de párrafos.
+                    full_synopsis.append(text) 
+           
             synopsis = "\n\n".join(full_synopsis)
 
         except NoSuchElementException:  
@@ -143,7 +148,7 @@ for i, book in enumerate(books_data):
         prices = {}
         price = "Precio no disponible" # Valor por defecto
         try:
-            # Buscamos todos los contenedores de formato/precio (WebDriverWait no es necesario aquí)
+           
             format_links = driver.find_elements(By.CSS_SELECTOR, "a[class*='OpcionesCompra_btnFormato']")
             
             for link_price in format_links:
@@ -161,7 +166,7 @@ for i, book in enumerate(books_data):
                 except NoSuchElementException:
                     continue
             
-            # Formatear el precio final para la salida
+            
             price_output = []
             if 'Físico' in prices:
                 price_output.append(f"Físico: {prices['Físico']}")
@@ -186,9 +191,7 @@ for i, book in enumerate(books_data):
     except Exception as e:
         print(f"⚠️ Error general al procesar el libro {book['link']}: {e}")
     finally:
-        # Volver a la página de la categoría (aunque no es estrictamente necesario ya que
-        # el error Stale Element se evitó pre-extrayendo los enlaces).
-        # Lo más importante es que el bucle itera sobre los enlaces, NO sobre los elementos DOM.
+        driver.back()
         pass
 
 # --- Finalizar ---
