@@ -30,7 +30,7 @@ url = "https://www.planetadelibros.com/"
 response = requests.get(url)
 soup = BeautifulSoup(response.text, "html.parser")
 
-tema = input("📚 Ingresá una temática (ej: terror, ficción, filosofía): ").strip().lower()
+tema = input("📚 Ingresá una temática (ej: terror, filosofía, psicología): ").strip().lower()
 
 links = soup.find_all("a", class_="MenuPrincipalDesktop_nav__linkItem__G87vt")
 categoria_url = None
@@ -71,6 +71,15 @@ except TimeoutException:
 except Exception as e:
     print(f"⚠️ Error al intentar cerrar el pop-up de cookies: {e}")
 
+try:
+    # Cerrar pop-up de newsletter si aparece
+    newsletter_close = WebDriverWait(driver, 3).until(
+        EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'close')] | //div[contains(text(), '×')]"))
+    )
+    newsletter_close.click()
+    print("✅ Pop-up de newsletter cerrado.")
+except TimeoutException:
+    print("ℹ️ No apareció pop-up de newsletter.")
 
 try:
     WebDriverWait(driver, 10).until(
